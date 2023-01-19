@@ -1,0 +1,17 @@
+
+{
+  "config": {
+    "classmap-authoritative": true
+  },
+  "autoload": {
+    "psr-4": {
+      "sunat\\iTop\\Extension\\": "src"
+    }
+  },
+  "name": "sunat/sunat-modulo-ticket-event",
+  "type": "itop-extension",
+  "description": "Modulo Ticket Eventos",
+  "require": {
+    "composer-runtime-api": "^2.0"
+  }
+}

@@ -1,0 +1,2786 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<itop_design xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="1.6">
+	<constants>
+		<constant id="PORTAL_TYPE_TO_CLASS" xsi:type="string" _delta="redefine">
+			<![CDATA[{,"service_request":"UserRequest","incident":"Incident","observation":"Observation","access":"Access","evento":"Evento"}]]>
+		</constant>
+		<constant id="PORTAL_EVENT_PUBLIC_LOG" xsi:type="string" _delta="define">
+			<![CDATA[public_log]]>
+		</constant>
+		<constant id="PORTAL_EVENT_USER_COMMENT" xsi:type="string" _delta="define">
+			<![CDATA[user_comment]]>
+		</constant>
+		<constant id="PORTAL_EVENT_FORM_ATTRIBUTES" xsi:type="string" _delta="define">
+			<![CDATA[title,description,impact,urgency]]>
+		</constant>
+		<constant id="PORTAL_EVENT_TYPE" xsi:type="string" _delta="define">
+			<![CDATA[]]>
+		</constant>
+		<constant id="PORTAL_EVENT_LIST_ZLIST" xsi:type="string" _delta="define">
+			<![CDATA[finalclass,title,start_date,status,servicesubcategory_id,priority,caller_id]]>
+		</constant>
+		<constant id="PORTAL_EVENT_CLOSED_ZLIST" xsi:type="string" _delta="define">
+			<![CDATA[title,start_date,close_date,servicesubcategory_id]]>
+		</constant>
+		<constant id="PORTAL_EVENT_DETAILS_ZLIST" xsi:type="string" _delta="define">
+			<![CDATA[{"col:left":["ref","caller_id","servicesubcategory_id","title","description","solution"],"col:right":["status","priority","start_date","resolution_date","last_update","agent_id"]}]]>
+		</constant>
+		<constant id="PORTAL_EVENT_DISPLAY_QUERY" xsi:type="string" _delta="define">
+			<![CDATA[SELECT Evento WHERE org_id = :contact->org_id AND caller_id = :contact->id]]>
+		</constant>
+		<constant id="PORTAL_EVENT_DISPLAY_POWERUSER_QUERY" xsi:type="string" _delta="define">
+			<![CDATA[SELECT Evento WHERE org_id = :contact->org_id]]>
+		</constant>
+	</constants>
+	<classes>
+		<!-- Guarda los tipos de alertas, seria indicado renombrar esta clase -->
+		<class id="EventoType" _delta="define">
+			<parent>cmdbAbstractObject</parent>
+			<properties>
+				<category>bizmodel,searchable,structure</category>
+				<abstract>false</abstract>
+				<key_type>autoincrement</key_type>
+				<db_table>event_type</db_table>
+				<db_key_field>id</db_key_field>
+				<db_final_class_field />
+				<naming>
+					<attributes>
+						<attribute id="name" />
+					</attributes>
+				</naming>
+				<display_template />
+				<icon>images/event.png</icon>
+				<reconciliation>
+					<attributes>
+						<attribute id="name" />
+						<attribute id="org_id" />
+						<attribute id="org_name" />
+					</attributes>
+				</reconciliation>
+				<obsolescence>
+					<condition>
+						<![CDATA[status = 'inactive']]>
+					</condition>
+				</obsolescence>
+				<uniqueness_rules>
+					<rule id="EventoType-name">
+						<attributes>
+							<attribute id="org_id" />
+							<attribute id="name" />
+						</attributes>
+						<filter>
+							<![CDATA[name != '']]>
+						</filter>
+						<disabled>false</disabled>
+						<is_blocking>true</is_blocking>
+					</rule>
+				</uniqueness_rules>
+			</properties>
+			<fields>
+				<field id="name" xsi:type="AttributeString">
+					<sql>name</sql>
+					<default_value />
+					<is_null_allowed>false</is_null_allowed>
+				</field>
+				<field id="status" xsi:type="AttributeEnum">
+					<values>
+						<value id="active">active</value>
+						<value id="inactive">inactive</value>
+					</values>
+					<sql>status</sql>
+					<default_value>active</default_value>
+					<is_null_allowed>true</is_null_allowed>
+					<display_style>list</display_style>
+				</field>
+				<field id="org_id" xsi:type="AttributeExternalKey">
+					<sql>org_id</sql>
+					<target_class>Organization</target_class>
+					<is_null_allowed>false</is_null_allowed>
+					<on_target_delete>DEL_MANUAL</on_target_delete>
+				</field>
+				<field id="org_name" xsi:type="AttributeExternalField">
+					<extkey_attcode>org_id</extkey_attcode>
+					<target_attcode>name</target_attcode>
+				</field>
+			</fields>
+			<methods />
+			<presentation>
+				<details>
+					<items>
+						<item id="name">
+							<rank>10</rank>
+						</item>
+						<item id="org_id">
+							<rank>30</rank>
+						</item>
+					</items>
+				</details>
+				<default_search>
+					<items>
+						<item id="name">
+							<rank>10</rank>
+						</item>
+						<item id="org_id">
+							<rank>30</rank>
+						</item>
+					</items>
+				</default_search>
+				<search>
+					<items>
+						<item id="name">
+							<rank>10</rank>
+						</item>
+						<item id="status">
+							<rank>30</rank>
+						</item>
+						<item id="org_id">
+							<rank>40</rank>
+						</item>
+					</items>
+				</search>
+				<list>
+					<items>
+						<item id="name">
+							<rank>20</rank>
+						</item>
+					</items>
+				</list>
+			</presentation>
+		</class>
+		<class id="Ticket" _delta="must_exist">
+			<methods>
+				<method id="MakeTicketRef" _delta="must_exist">
+					<code _delta="redefine">
+						<![CDATA[
+        protected function MakeTicketRef($iNextId)
+        {
+                switch(get_class($this))
+                {
+                        case 'UserRequest':
+                        $sFormat = 'R-%06d';
+                        break;
+
+                        case 'Incident':
+                        $sFormat = 'I-%06d';
+                        break;
+
+                        case 'Change':
+                        case 'RoutineChange':
+                        case 'EmergencyChange':
+                        case 'NormalChange':
+                        $sFormat = 'C-%06d';
+                        break;
+
+                        case 'Problem':
+                        $sFormat = 'P-%06d';
+                        break;
+                        
+                        case 'Observation':
+                        $sFormat = 'O-%06d';
+                        break;
+
+                        case 'Access':
+                        $sFormat = 'A-%06d';
+                        break;
+                        
+                        case 'Evento':
+                        $sFormat = 'E-%06d';
+                        break;
+
+                        default:
+                        $sFormat = 'T-%06d';
+                }
+                return sprintf($sFormat, $iNextId);
+        }
+        ]]>
+					</code>
+				</method>
+			</methods>
+		</class>
+		<class id="Evento" _delta="define">
+			<parent>Ticket</parent>
+			<properties>
+				<comment>
+					<![CDATA[/**
+					* Persistent classes for a CMDB
+					*
+					* @copyright   Copyright (C) 2010-2012 Combodo SARL
+					* @license     http://opensource.org/licenses/AGPL-3.0
+					*/]]>
+				</comment>
+				<category>bizmodel,searchable,requestmgmt</category>
+				<abstract>false</abstract>
+				<key_type>autoincrement</key_type>
+				<db_table>ticket_event</db_table>
+				<db_key_field>id</db_key_field>
+				<db_final_class_field />
+				<naming>
+					<attributes>
+						<attribute id="ref" />
+					</attributes>
+				</naming>
+				<display_template />
+				<icon>images/event.png</icon>
+				<reconciliation>
+					<attributes>
+						<attribute id="ref" />
+					</attributes>
+				</reconciliation>
+				<order>
+					<columns>
+						<column id="ref" ascending="false" />
+					</columns>
+				</order>
+			</properties>
+			<fields>
+				<field id="status" xsi:type="AttributeEnum">
+					<always_load_in_tables>true</always_load_in_tables>
+					<values>
+						<value id="new">new</value>
+						<value id="assigned">assigned</value>
+						<value id="pending">pending</value>
+						<value id="escalated_tto">escalated_tto</value>
+						<value id="escalated_ttr">escalated_ttr</value>
+						<value id="resolved">resolved</value>
+						<value id="closed">closed</value>
+					</values>
+					<sql>status</sql>
+					<default_value>new</default_value>
+					<is_null_allowed>false</is_null_allowed>
+				</field>
+				<field id="request_type" xsi:type="AttributeEnum">
+					<values>
+						<value id="evento">evento</value>
+					</values>
+					<sql>request_type</sql>
+					<default_value>evento</default_value>
+					<is_null_allowed>true</is_null_allowed>
+					<display_style>list</display_style>
+				</field>
+				<field id="impact" xsi:type="AttributeEnum">
+					<values>
+						<value id="1">1</value>
+						<value id="2">2</value>
+						<value id="3">3</value>
+					</values>
+					<sql>impact</sql>
+					<default_value>1</default_value>
+					<is_null_allowed>false</is_null_allowed>
+					<display_style>list</display_style>
+				</field>
+				<field id="priority" xsi:type="AttributeEnum">
+					<values>
+						<value id="1">1</value>
+						<value id="2">2</value>
+						<value id="3">3</value>
+						<value id="4">4</value>
+					</values>
+					<dependencies>
+						<attribute id="impact" />
+						<attribute id="urgency" />
+					</dependencies>
+					<sql>priority</sql>
+					<default_value>4</default_value>
+					<is_null_allowed>false</is_null_allowed>
+				</field>
+				<field id="urgency" xsi:type="AttributeEnum">
+					<values>
+						<value id="1">1</value>
+						<value id="2">2</value>
+						<value id="3">3</value>
+						<value id="4">4</value>
+					</values>
+					<sql>urgency</sql>
+					<default_value>4</default_value>
+					<is_null_allowed>false</is_null_allowed>
+				</field>
+				<field id="origin" xsi:type="AttributeEnum">
+					<values>
+						<value id="PRTG">PRTG</value>
+						<value id="Dynatrace">Dynatrace</value>
+						<value id="24x7">24x7</value>
+						<value id="Tomcat">Tomcat</value>
+					</values>
+					<sql>origin</sql>
+					<default_value>PRTG</default_value>
+					<is_null_allowed>false</is_null_allowed>
+					<display_style>list</display_style>
+				</field>
+				<field id="type_id" xsi:type="AttributeExternalKey">
+					<sql>type_id</sql>
+					<target_class>EventoType</target_class>
+					<is_null_allowed>true</is_null_allowed>
+					<on_target_delete>DEL_AUTO</on_target_delete>
+					<allow_target_creation>true</allow_target_creation>
+				</field>
+				<field id="type_name" xsi:type="AttributeExternalField">
+					<extkey_attcode>type_id</extkey_attcode>
+					<target_attcode>name</target_attcode>
+				</field>
+				<field id="service_id" xsi:type="AttributeExternalKey">
+					<filter>
+						<![CDATA[SELECT Service AS s JOIN lnkCustomerContractToService AS l1 ON l1.service_id=s.id JOIN CustomerContract AS cc ON l1.customercontract_id=cc.id WHERE cc.org_id = :this->org_id AND s.status != 'obsolete']]>
+					</filter>
+					<dependencies>
+						<attribute id="org_id" />
+					</dependencies>
+					<sql>service_id</sql>
+					<target_class>Service</target_class>
+					<is_null_allowed>true</is_null_allowed>
+					<on_target_delete>DEL_MANUAL</on_target_delete>
+					<allow_target_creation>false</allow_target_creation>
+				</field>
+				<field id="service_name" xsi:type="AttributeExternalField">
+					<extkey_attcode>service_id</extkey_attcode>
+					<target_attcode>name</target_attcode>
+				</field>
+				<field id="servicesubcategory_id" xsi:type="AttributeExternalKey">
+					<filter>
+						<![CDATA[SELECT ServiceSubcategory WHERE service_id = :this->service_id AND request_type = 'incident' AND status != 'obsolete']]>
+					</filter>
+					<dependencies>
+						<attribute id="service_id" />
+						<attribute id="request_type" />
+					</dependencies>
+					<sql>servicesubcategory_id</sql>
+					<target_class>ServiceSubcategory</target_class>
+					<is_null_allowed>true</is_null_allowed>
+					<on_target_delete>DEL_MANUAL</on_target_delete>
+					<allow_target_creation>false</allow_target_creation>
+				</field>
+				<field id="servicesubcategory_name" xsi:type="AttributeExternalField">
+					<extkey_attcode>servicesubcategory_id</extkey_attcode>
+					<target_attcode>name</target_attcode>
+				</field>
+				<field id="escalation_flag" xsi:type="AttributeEnum">
+					<values>
+						<value id="yes">yes</value>
+						<value id="no">no</value>
+					</values>
+					<sql>escalation_flag</sql>
+					<default_value>no</default_value>
+					<is_null_allowed>true</is_null_allowed>
+					<display_style>list</display_style>
+				</field>
+				<field id="escalation_reason" xsi:type="AttributeString">
+					<sql>escalation_reason</sql>
+					<default_value />
+					<is_null_allowed>true</is_null_allowed>
+				</field>
+				<field id="assignment_date" xsi:type="AttributeDateTime">
+					<sql>assignment_date</sql>
+					<default_value />
+					<is_null_allowed>true</is_null_allowed>
+				</field>
+				<field id="resolution_date" xsi:type="AttributeDateTime">
+					<sql>resolution_date</sql>
+					<default_value />
+					<is_null_allowed>true</is_null_allowed>
+				</field>
+				<field id="last_pending_date" xsi:type="AttributeDateTime">
+					<sql>last_pending_date</sql>
+					<default_value />
+					<is_null_allowed>true</is_null_allowed>
+				</field>
+				<field id="cumulatedpending" xsi:type="AttributeStopWatch">
+					<states>
+						<state id="pending" />
+					</states>
+					<working_time />
+					<thresholds />
+					<goal />
+				</field>
+				<field id="tto" xsi:type="AttributeStopWatch">
+					<always_load_in_tables>true</always_load_in_tables>
+					<states>
+						<state id="new" />
+						<state id="escalated_tto" />
+					</states>
+					<working_time />
+					<goal>ResponseTicketTTO</goal>
+					<thresholds>
+						<threshold id="75">
+							<highlight>
+								<code>warning</code>
+								<persistent>false</persistent>
+							</highlight>
+							<actions></actions>
+						</threshold>
+						<threshold id="100">
+							<highlight>
+								<code>critical</code>
+								<persistent>false</persistent>
+							</highlight>
+							<actions>
+								<action>
+									<verb>ApplyStimulus</verb>
+									<params>
+										<param>ev_timeout</param>
+									</params>
+								</action>
+							</actions>
+						</threshold>
+					</thresholds>
+				</field>
+				<field id="ttr" xsi:type="AttributeStopWatch">
+					<always_load_in_tables>true</always_load_in_tables>
+					<states>
+						<state id="new" />
+						<state id="escalated_tto" />
+						<state id="assigned" />
+						<state id="escalated_ttr" />
+					</states>
+					<working_time />
+					<goal>ResponseTicketTTR</goal>
+					<thresholds>
+						<threshold id="75">
+							<highlight>
+								<code>warning</code>
+								<persistent>false</persistent>
+							</highlight>
+							<actions></actions>
+						</threshold>
+						<threshold id="100">
+							<highlight>
+								<code>critical</code>
+								<persistent>false</persistent>
+							</highlight>
+							<actions>
+								<action>
+									<verb>ApplyStimulus</verb>
+									<params>
+										<param>ev_timeout</param>
+									</params>
+								</action>
+							</actions>
+						</threshold>
+					</thresholds>
+				</field>
+				<field id="tto_escalation_deadline" xsi:type="AttributeSubItem">
+					<target_attcode>tto</target_attcode>
+					<item_code>100_deadline</item_code>
+				</field>
+				<field id="sla_tto_passed" xsi:type="AttributeSubItem">
+					<target_attcode>tto</target_attcode>
+					<item_code>100_passed</item_code>
+				</field>
+				<field id="sla_tto_over" xsi:type="AttributeSubItem">
+					<target_attcode>tto</target_attcode>
+					<item_code>100_overrun</item_code>
+				</field>
+				<field id="ttr_escalation_deadline" xsi:type="AttributeSubItem">
+					<target_attcode>ttr</target_attcode>
+					<item_code>100_deadline</item_code>
+				</field>
+				<field id="sla_ttr_passed" xsi:type="AttributeSubItem">
+					<target_attcode>ttr</target_attcode>
+					<item_code>100_passed</item_code>
+				</field>
+				<field id="sla_ttr_over" xsi:type="AttributeSubItem">
+					<target_attcode>ttr</target_attcode>
+					<item_code>100_overrun</item_code>
+				</field>
+				<field id="time_spent" xsi:type="AttributeDuration">
+					<sql>time_spent</sql>
+					<default_value />
+					<is_null_allowed>true</is_null_allowed>
+				</field>
+				<field id="resolution_code" xsi:type="AttributeEnum">
+					<values>
+						<value id="assistance">assistance</value>
+						<value id="other">other</value>
+						<value id="software patch">software patch</value>
+						<value id="training">training</value>
+						<value id="hardware repair">hardware repair</value>
+						<value id="system update">system update</value>
+						<value id="bug fixed">bug fixed</value>
+					</values>
+					<sql>resolution_code</sql>
+					<default_value>assistance</default_value>
+					<is_null_allowed>true</is_null_allowed>
+					<display_style>list</display_style>
+				</field>
+				<field id="solution" xsi:type="AttributeText">
+					<sql>solution</sql>
+					<default_value />
+					<is_null_allowed>true</is_null_allowed>
+				</field>
+				<field id="pending_reason" xsi:type="AttributeText">
+					<sql>pending_reason</sql>
+					<default_value />
+					<is_null_allowed>true</is_null_allowed>
+				</field>
+				<field id="parent_incident_id" xsi:type="AttributeExternalKey">
+					<filter>
+						<![CDATA[SELECT Evento WHERE id != :this->id AND status NOT IN ('resolved','closed')]]>
+					</filter>
+					<sql>parent_incident_id</sql>
+					<target_class>Evento</target_class>
+					<is_null_allowed>true</is_null_allowed>
+					<on_target_delete>DEL_MANUAL</on_target_delete>
+				</field>
+				<field id="parent_incident_ref" xsi:type="AttributeExternalField">
+					<extkey_attcode>parent_incident_id</extkey_attcode>
+					<target_attcode>ref</target_attcode>
+				</field>
+				<field id="parent_problem_id" xsi:type="AttributeExternalKey">
+					<sql>parent_problem_id</sql>
+					<target_class>Problem</target_class>
+					<is_null_allowed>true</is_null_allowed>
+					<on_target_delete>DEL_MANUAL</on_target_delete>
+				</field>
+				<field id="parent_problem_ref" xsi:type="AttributeExternalField">
+					<extkey_attcode>parent_problem_id</extkey_attcode>
+					<target_attcode>ref</target_attcode>
+				</field>
+				<field id="parent_change_id" xsi:type="AttributeExternalKey">
+					<filter>
+						<![CDATA[SELECT Change WHERE status != "closed"]]>
+					</filter>
+					<sql>parent_change_id</sql>
+					<target_class>Change</target_class>
+					<is_null_allowed>true</is_null_allowed>
+					<on_target_delete>DEL_MANUAL</on_target_delete>
+				</field>
+				<field id="parent_change_ref" xsi:type="AttributeExternalField">
+					<extkey_attcode>parent_change_id</extkey_attcode>
+					<target_attcode>ref</target_attcode>
+				</field>
+				<field id="related_request_list" xsi:type="AttributeLinkedSet">
+					<linked_class>UserRequest</linked_class>
+					<ext_key_to_me>parent_incident_id</ext_key_to_me>
+					<edit_mode>add_remove</edit_mode>
+					<count_min>0</count_min>
+					<count_max>0</count_max>
+				</field>
+				<field id="child_incidents_list" xsi:type="AttributeLinkedSet">
+					<linked_class>Incident</linked_class>
+					<ext_key_to_me>parent_incident_id</ext_key_to_me>
+					<edit_mode>add_remove</edit_mode>
+					<count_min>0</count_min>
+					<count_max>0</count_max>
+				</field>
+				<field id="public_log" xsi:type="AttributeCaseLog">
+					<sql>public_log</sql>
+					<default_value />
+					<is_null_allowed>true</is_null_allowed>
+				</field>
+				<field id="user_satisfaction" xsi:type="AttributeEnum">
+					<values>
+						<value id="1">1</value>
+						<value id="2">2</value>
+						<value id="3">3</value>
+						<value id="4">4</value>
+					</values>
+					<sql>user_satisfaction</sql>
+					<default_value>1</default_value>
+					<is_null_allowed>true</is_null_allowed>
+					<display_style>list</display_style>
+				</field>
+				<field id="user_comment" xsi:type="AttributeText">
+					<sql>user_commment</sql>
+					<default_value />
+					<is_null_allowed>true</is_null_allowed>
+				</field>
+			</fields>
+			<lifecycle>
+				<highlight_scale>
+					<item id="warning">
+						<rank>1</rank>
+						<color>HIGHLIGHT_CLASS_WARNING</color>
+						<icon>images/event-deadline.png</icon>
+					</item>
+					<item id="critical">
+						<rank>2</rank>
+						<color>HIGHLIGHT_CLASS_CRITICAL</color>
+						<icon>images/event-escalated.png</icon>
+					</item>
+					<item id="closed">
+						<rank>3</rank>
+						<color>HIGHLIGHT_CLASS_NONE</color>
+						<icon>images/event-closed.png</icon>
+					</item>
+				</highlight_scale>
+				<attribute>status</attribute>
+				<stimuli>
+					<stimulus id="ev_assign" xsi:type="StimulusUserAction" />
+					<stimulus id="ev_reassign" xsi:type="StimulusUserAction" />
+					<stimulus id="ev_pending" xsi:type="StimulusUserAction" />
+					<stimulus id="ev_timeout" xsi:type="StimulusInternal" />
+					<stimulus id="ev_autoresolve" xsi:type="StimulusInternal" />
+					<stimulus id="ev_autoclose" xsi:type="StimulusInternal" />
+					<stimulus id="ev_resolve" xsi:type="StimulusUserAction" />
+					<stimulus id="ev_close" xsi:type="StimulusUserAction" />
+					<stimulus id="ev_reopen" xsi:type="StimulusUserAction" />
+				</stimuli>
+				<states>
+					<state id="new">
+						<flags>
+							<attribute id="ref">
+								<read_only />
+							</attribute>
+							<attribute id="org_id">
+								<mandatory />
+							</attribute>
+							<attribute id="caller_id">
+								<mandatory />
+							</attribute>
+							<attribute id="team_id">
+								<hidden />
+							</attribute>
+							<attribute id="agent_id">
+								<hidden />
+							</attribute>
+							<attribute id="priority">
+								<read_only />
+							</attribute>
+							<attribute id="start_date">
+								<read_only />
+							</attribute>
+							<attribute id="last_update">
+								<read_only />
+							</attribute>
+							<attribute id="close_date">
+								<hidden />
+							</attribute>
+							<attribute id="request_type">
+								<read_only />
+							</attribute>
+							<attribute id="escalation_flag">
+								<hidden />
+							</attribute>
+							<attribute id="escalation_reason">
+								<hidden />
+							</attribute>
+							<attribute id="assignment_date">
+								<hidden />
+							</attribute>
+							<attribute id="resolution_date">
+								<hidden />
+							</attribute>
+							<attribute id="last_pending_date">
+								<hidden />
+							</attribute>
+							<attribute id="time_spent">
+								<hidden />
+							</attribute>
+							<attribute id="resolution_code">
+								<hidden />
+							</attribute>
+							<attribute id="solution">
+								<hidden />
+							</attribute>
+							<attribute id="pending_reason">
+								<hidden />
+							</attribute>
+							<attribute id="user_satisfaction">
+								<hidden />
+							</attribute>
+							<attribute id="user_comment">
+								<hidden />
+							</attribute>
+							<attribute id="tto_escalation_deadline">
+								<read_only />
+							</attribute>
+							<attribute id="sla_tto_passed">
+								<hidden />
+							</attribute>
+							<attribute id="sla_tto_over">
+								<hidden />
+							</attribute>
+							<attribute id="sla_ttr_passed"></attribute>
+							<attribute id="ttr_escalation_deadline">
+								<hidden />
+							</attribute>
+							<attribute id="sla_ttr_over">
+								<hidden />
+							</attribute>
+						</flags>
+						<transitions>
+							<transition id="ev_assign">
+								<target>assigned</target>
+								<hidden />
+								<actions>
+									<action>
+										<verb>SetCurrentDate</verb>
+										<params>
+											<param xsi:type="attcode">assignment_date</param>
+										</params>
+									</action>
+								</actions>
+							</transition>
+							<transition id="ev_timeout">
+								<target>escalated_tto</target>
+								<actions />
+							</transition>
+							<transition id="ev_autoresolve">
+								<target>resolved</target>
+								<actions>
+									<action>
+										<verb>SetCurrentDate</verb>
+										<params>
+											<param xsi:type="attcode">resolution_date</param>
+										</params>
+									</action>
+									<action>
+										<verb>SetElapsedTime</verb>
+										<params>
+											<param xsi:type="attcode">time_spent</param>
+											<param xsi:type="attcode">start_date</param>
+											<param xsi:type="string">DefaultWorkingTimeComputer</param>
+										</params>
+									</action>
+									<action>
+										<verb>ResolveChildTickets</verb>
+										<params />
+									</action>
+								</actions>
+							</transition>
+						</transitions>
+					</state>
+					<state id="escalated_tto">
+						<highlight>
+							<code>critical</code>
+						</highlight>
+						<inherit_flags_from>new</inherit_flags_from>
+						<flags>
+							<attribute id="team_id" />
+						</flags>
+						<transitions>
+							<transition id="ev_assign">
+								<target>assigned</target>
+								<actions>
+									<action>
+										<verb>SetAssignedDate</verb>
+									</action>
+								</actions>
+							</transition>
+						</transitions>
+					</state>
+					<state id="assigned">
+						<inherit_flags_from>new</inherit_flags_from>
+						<flags>
+							<attribute id="team_id">
+								<mandatory />
+								<must_prompt />
+								<read_only />
+							</attribute>
+							<attribute id="agent_id">
+								<mandatory />
+								<must_prompt />
+								<read_only />
+							</attribute>
+							<attribute id="assignment_date">
+								<read_only />
+							</attribute>
+							<attribute id="tto_escalation_deadline">
+								<hidden />
+							</attribute>
+							<attribute id="sla_tto_passed">
+								<read_only />
+							</attribute>
+							<attribute id="sla_tto_over">
+								<read_only />
+							</attribute>
+							<attribute id="ttr_escalation_deadline">
+								<read_only />
+							</attribute>
+							<attribute id="caller_id" />
+							<attribute id="escalation_flag" />
+							<attribute id="escalation_reason" />
+						</flags>
+						<transitions>
+							<transition id="ev_pending">
+								<target>pending</target>
+								<actions>
+									<action>
+										<verb>SetCurrentDate</verb>
+										<params>
+											<param xsi:type="attcode">last_pending_date</param>
+										</params>
+									</action>
+								</actions>
+							</transition>
+							<transition id="ev_resolve">
+								<target>resolved</target>
+								<actions>
+									<action>
+										<verb>SetCurrentDate</verb>
+										<params>
+											<param xsi:type="attcode">resolution_date</param>
+										</params>
+									</action>
+									<action>
+										<verb>SetElapsedTime</verb>
+										<params>
+											<param xsi:type="attcode">time_spent</param>
+											<param xsi:type="attcode">start_date</param>
+											<param xsi:type="string">DefaultWorkingTimeComputer</param>
+										</params>
+									</action>
+									<action>
+										<verb>ResolveChildTickets</verb>
+										<params />
+									</action>
+								</actions>
+							</transition>
+							<transition id="ev_reassign">
+								<target>assigned</target>
+								<actions />
+								<flags>
+									<attribute id="agent_id">
+										<must_change />
+									</attribute>
+									<attribute id="team_id">
+										<must_prompt />
+									</attribute>
+								</flags>
+							</transition>
+							<transition id="ev_timeout">
+								<target>escalated_ttr</target>
+								<actions />
+							</transition>
+							<transition id="ev_autoresolve">
+								<target>resolved</target>
+								<actions>
+									<action>
+										<verb>SetCurrentDate</verb>
+										<params>
+											<param xsi:type="attcode">resolution_date</param>
+										</params>
+									</action>
+									<action>
+										<verb>SetElapsedTime</verb>
+										<params>
+											<param xsi:type="attcode">time_spent</param>
+											<param xsi:type="attcode">start_date</param>
+											<param xsi:type="string">DefaultWorkingTimeComputer</param>
+										</params>
+									</action>
+									<action>
+										<verb>ResolveChildTickets</verb>
+										<params />
+									</action>
+								</actions>
+							</transition>
+						</transitions>
+					</state>
+					<state id="escalated_ttr">
+						<highlight>
+							<code>critical</code>
+						</highlight>
+						<inherit_flags_from>assigned</inherit_flags_from>
+						<flags />
+						<transitions>
+							<transition id="ev_pending">
+								<target>pending</target>
+								<actions>
+									<action>
+										<verb>SetCurrentDate</verb>
+										<params>
+											<param xsi:type="attcode">last_pending_date</param>
+										</params>
+									</action>
+								</actions>
+							</transition>
+							<transition id="ev_resolve">
+								<target>resolved</target>
+								<actions>
+									<action>
+										<verb>SetCurrentDate</verb>
+										<params>
+											<param xsi:type="attcode">resolution_date</param>
+										</params>
+									</action>
+									<action>
+										<verb>SetElapsedTime</verb>
+										<params>
+											<param xsi:type="attcode">time_spent</param>
+											<param xsi:type="attcode">start_date</param>
+											<param xsi:type="string">DefaultWorkingTimeComputer</param>
+										</params>
+									</action>
+									<action>
+										<verb>ResolveChildTickets</verb>
+										<params />
+									</action>
+								</actions>
+							</transition>
+							<transition id="ev_reassign">
+								<target>assigned</target>
+								<actions />
+							</transition>
+							<transition id="ev_autoresolve">
+								<target>resolved</target>
+								<actions>
+									<action>
+										<verb>SetCurrentDate</verb>
+										<params>
+											<param xsi:type="attcode">resolution_date</param>
+										</params>
+									</action>
+									<action>
+										<verb>SetElapsedTime</verb>
+										<params>
+											<param xsi:type="attcode">time_spent</param>
+											<param xsi:type="attcode">start_date</param>
+											<param xsi:type="string">DefaultWorkingTimeComputer</param>
+										</params>
+									</action>
+									<action>
+										<verb>ResolveChildTickets</verb>
+										<params />
+									</action>
+								</actions>
+							</transition>
+						</transitions>
+					</state>
+					<state id="pending">
+						<inherit_flags_from>assigned</inherit_flags_from>
+						<flags>
+							<attribute id="last_pending_date">
+								<read_only />
+							</attribute>
+							<attribute id="ttr_escalation_deadline">
+								<hidden />
+							</attribute>
+							<attribute id="sla_tto_passed">
+								<hidden />
+							</attribute>
+							<attribute id="sla_tto_over">
+								<hidden />
+							</attribute>
+							<attribute id="pending_reason">
+								<mandatory />
+								<must_prompt />
+							</attribute>
+						</flags>
+						<transitions>
+							<transition id="ev_assign">
+								<target>assigned</target>
+								<actions></actions>
+							</transition>
+							<transition id="ev_autoresolve">
+								<target>resolved</target>
+								<actions>
+									<action>
+										<verb>SetCurrentDate</verb>
+										<params>
+											<param xsi:type="attcode">resolution_date</param>
+										</params>
+									</action>
+									<action>
+										<verb>SetElapsedTime</verb>
+										<params>
+											<param xsi:type="attcode">time_spent</param>
+											<param xsi:type="attcode">start_date</param>
+											<param xsi:type="string">DefaultWorkingTimeComputer</param>
+										</params>
+									</action>
+									<action>
+										<verb>ResolveChildTickets</verb>
+										<params />
+									</action>
+								</actions>
+							</transition>
+						</transitions>
+					</state>
+					<state id="resolved">
+						<highlight>
+							<code>closed</code>
+						</highlight>
+						<inherit_flags_from>assigned</inherit_flags_from>
+						<flags>
+							<attribute id="caller_id">
+								<read_only />
+							</attribute>
+							<attribute id="origin">
+								<read_only />
+							</attribute>
+							<attribute id="private_log" />
+							<attribute id="impact">
+								<read_only />
+							</attribute>
+							<attribute id="urgency">
+								<read_only />
+							</attribute>
+							<attribute id="type_id">
+								<mandatory />
+								<must_prompt />
+							</attribute>
+							<attribute id="service_id">
+								<mandatory />
+								<must_prompt />
+							</attribute>
+							<attribute id="servicesubcategory_id">
+								<must_prompt />
+							</attribute>
+							<attribute id="escalation_flag">
+								<read_only />
+							</attribute>
+							<attribute id="escalation_reason">
+								<read_only />
+							</attribute>
+							<attribute id="parent_incident_id">
+								<read_only />
+							</attribute>
+							<attribute id="parent_change_id">
+								<read_only />
+							</attribute>
+							<attribute id="parent_problem_id">
+								<read_only />
+							</attribute>
+							<attribute id="title">
+								<read_only />
+							</attribute>
+							<attribute id="description">
+								<read_only />
+							</attribute>
+							<attribute id="org_id">
+								<read_only />
+							</attribute>
+							<attribute id="team_id">
+								<read_only />
+							</attribute>
+							<attribute id="agent_id">
+								<read_only />
+							</attribute>
+							<attribute id="resolution_date">
+								<read_only />
+							</attribute>
+							<attribute id="time_spent">
+								<read_only />
+							</attribute>
+							<attribute id="resolution_code">
+								<mandatory />
+								<must_prompt />
+							</attribute>
+							<attribute id="solution">
+								<mandatory />
+								<must_prompt />
+							</attribute>
+							<attribute id="pending_reason">
+								<read_only />
+							</attribute>
+							<attribute id="sla_ttr_passed">
+								<read_only />
+							</attribute>
+							<attribute id="ttr_escalation_deadline">
+								<hidden />
+							</attribute>
+							<attribute id="sla_ttr_over">
+								<read_only />
+							</attribute>
+						</flags>
+						<transitions>
+							<transition id="ev_close">
+								<target>closed</target>
+								<actions>
+									<action>
+										<verb>SetCurrentDate</verb>
+										<params>
+											<param xsi:type="attcode">close_date</param>
+										</params>
+									</action>
+								</actions>
+							</transition>
+							<transition id="ev_reopen">
+								<target>assigned</target>
+								<actions></actions>
+							</transition>
+							<transition id="ev_autoresolve">
+								<target>resolved</target>
+								<actions>
+									<action>
+										<verb>SetCurrentDate</verb>
+										<params>
+											<param xsi:type="attcode">resolution_date</param>
+										</params>
+									</action>
+									<action>
+										<verb>SetElapsedTime</verb>
+										<params>
+											<param xsi:type="attcode">time_spent</param>
+											<param xsi:type="attcode">start_date</param>
+											<param xsi:type="string">DefaultWorkingTimeComputer</param>
+										</params>
+									</action>
+									<action>
+										<verb>ResolveChildTickets</verb>
+										<params />
+									</action>
+								</actions>
+							</transition>
+						</transitions>
+					</state>
+					<state id="closed">
+						<highlight>
+							<code>closed</code>
+						</highlight>
+						<inherit_flags_from>resolved</inherit_flags_from>
+						<flags>
+							<attribute id="public_log">
+								<read_only />
+							</attribute>
+							<attribute id="functionalcis_list">
+								<read_only />
+							</attribute>
+							<attribute id="contacts_list">
+								<read_only />
+							</attribute>
+							<attribute id="private_log">
+								<read_only />
+							</attribute>
+							<attribute id="type_id">
+								<read_only />
+							</attribute>
+							<attribute id="service_id">
+								<read_only />
+							</attribute>
+							<attribute id="servicesubcategory_id">
+								<read_only />
+							</attribute>
+							<attribute id="close_date">
+								<read_only />
+							</attribute>
+							<attribute id="resolution_code">
+								<read_only />
+							</attribute>
+							<attribute id="solution">
+								<read_only />
+							</attribute>
+							<attribute id="pending_reason">
+								<read_only />
+							</attribute>
+							<attribute id="user_satisfaction">
+								<read_only />
+								<must_prompt />
+							</attribute>
+							<attribute id="user_comment">
+								<read_only />
+								<must_prompt />
+							</attribute>
+						</flags>
+						<transitions />
+					</state>
+				</states>
+			</lifecycle>
+			<methods>
+				<method id="SetAssignedDate">
+					<comment>
+						<![CDATA[/**
+	 * To be deprecated: use SetCurrentDate() instead
+	 * @return void
+	 */]]>
+					</comment>
+					<static>false</static>
+					<access>public</access>
+					<type>LifecycleAction</type>
+					<code>
+						<![CDATA[	public function SetAssignedDate($sStimulusCode)
+	{
+		$this->Set('assignment_date', time());
+		return true;
+	}]]>
+					</code>
+				</method>
+				<method id="SetLastPendingDate">
+					<comment>
+						<![CDATA[/**
+	 * To be deprecated: use SetCurrentDate() instead
+	 * @return void
+	 */]]>
+					</comment>
+					<static>false</static>
+					<access>public</access>
+					<type>LifecycleAction</type>
+					<code>
+						<![CDATA[	public function SetLastPendingDate($sStimulusCode)
+	{
+		$this->Set('last_pending_date', time());
+		return true;
+	}]]>
+					</code>
+				</method>
+				<method id="SetResolveDate">
+					<comment>
+						<![CDATA[/**
+	 * To be deprecated: use SetCurrentDate() and SetElapsedTime() instead
+	 * @return void
+	 */]]>
+					</comment>
+					<static>false</static>
+					<access>public</access>
+					<type>LifecycleAction</type>
+					<code>
+						<![CDATA[	public function SetResolveDate($sStimulusCode)
+	{
+		$this->Set('resolution_date', time());
+                $iTimeSpent = time() - AttributeDateTime::GetAsUnixSeconds($this->Get('start_date'));
+		$this->Set('time_spent', $iTimeSpent);
+		return true;
+	}]]>
+					</code>
+				</method>
+				<method id="SetClosureDate">
+					<comment>
+						<![CDATA[/**
+	 * To be deprecated: use SetCurrentDate() instead
+	 * @return void
+	 */]]>
+					</comment>
+					<static>false</static>
+					<access>public</access>
+					<type>LifecycleAction</type>
+					<code>
+						<![CDATA[	public function SetClosureDate($sStimulusCode)
+	{
+		$this->Set('close_date', time());
+		return true;
+	}]]>
+					</code>
+				</method>
+				<method id="DoCheckToWrite">
+					<static>false</static>
+					<access>public</access>
+					<type>Overload-DBObject</type>
+					<code>
+						<![CDATA[public function DoCheckToWrite()
+  {
+    parent::DoCheckToWrite();
+    if (!$this->IsNew() && ($this->Get('parent_incident_id') == $this->GetKey()))
+    {
+      $this->m_aCheckIssues[] = Dict::Format('Class:Evento/Error:CannotAssignParentEventoIdToSelf');
+    }
+  }]]>
+					</code>
+				</method>
+				<method id="ComputePriority">
+					<comment>/** Compute the priority of the ticket based on its impact and urgency&#13;
+						* @return integer The priority of the ticket 1(high) .. 3(low)&#13;
+						*/</comment>
+					<static>false</static>
+					<access>public</access>
+					<type>LifecycleAction</type>
+					<code>
+						<![CDATA[        public function ComputePriority()
+        {
+                // priority[impact][urgency]
+                $aPriorities = array(
+                        // single person
+                        1 => array(
+                                        1 => 1,
+                                        2 => 1,
+                                        3 => 2,
+                                        4 => 4,
+                        ),
+                        // a group
+                        2 => array(
+                                1 => 1,
+                                2 => 2,
+                                3 => 3,
+                                4 => 4,
+                        ),
+                        // a departement!
+                        3 => array(
+                                        1 => 2,
+                                        2 => 3,
+                                        3 => 3,
+                                        4 => 4,
+                        ),
+                );
+                $iPriority = 1;
+                if (isset($aPriorities[(int)$this->Get('impact')]) && isset($aPriorities[(int)$this->Get('impact')][(int)$this->Get('urgency')]))
+                {
+                        $iPriority = $aPriorities[(int)$this->Get('impact')][(int)$this->Get('urgency')];
+                }
+                return $iPriority;              
+        }]]>
+					</code>
+				</method>
+				<method id="ComputeValues">
+					<static>false</static>
+					<access>public</access>
+					<type>Overload-DBObject</type>
+					<code>
+						<![CDATA[	public function ComputeValues()
+	{
+
+		// Compute the priority of the ticket
+		$this->Set('priority', $this->ComputePriority());
+
+		return parent::ComputeValues();
+	}]]>
+					</code>
+				</method>
+				<method id="DisplayBareRelations">
+					<static>false</static>
+					<access>public</access>
+					<type>Overload-cmdbAbstractObject</type>
+					<code>
+						<![CDATA[	function DisplayBareRelations(WebPage $oPage, $bEditMode = false)
+	{
+		parent::DisplayBareRelations($oPage, $bEditMode);
+
+		if (!$bEditMode)
+		{
+			if (MetaModel::IsValidClass('KnownError'))
+			{
+				//Search for known errors
+				$oPage->SetCurrentTab(Dict::S('Class:UserRequest:KnownErrorList'));
+				$iTicketID = $this->GetKey();;
+				$oKnownErrorSet = new CMDBObjectSet(DBObjectSearch::FromOQL("SELECT KnownError AS ke JOIN lnkErrorToFunctionalCI AS l1 ON l1.error_id=ke.id JOIN FunctionalCI AS ci ON l1.functionalci_id=ci.id JOIN lnkFunctionalCIToTicket AS l2 ON l2.functionalci_id=ci.id WHERE l2.ticket_id=$iTicketID"));
+				$iNumberKE=$oKnownErrorSet->count();
+				if ($iNumberKE > 0)
+				{
+					$oPage->SetCurrentTab(Dict::S('Class:UserRequest:KnownErrorList')." ($iNumberKE)");
+				}
+				else
+				{
+					$oPage->SetCurrentTab(Dict::S('Class:UserRequest:KnownErrorList'));	
+				}			
+				self::DisplaySet($oPage, $oKnownErrorSet, array ('menu' => false));
+			}
+		}
+	}]]>
+					</code>
+				</method>
+				<method id="resolveChilds">
+					<comment>
+						<![CDATA[/**
+	 * To be deprecated: use ResolveChildTickets() instead
+	 */]]>
+					</comment>
+					<static>false</static>
+					<access>public</access>
+					<type>LifecycleAction</type>
+					<code>
+						<![CDATA[	public function resolveChilds($sStimulusCode)
+	{
+        if (MetaModel::IsValidClass('UserRequest'))
+        {
+    		$sOQL = "SELECT UserRequest WHERE parent_incident_id=:ticket";
+    		$oChildRequestSet = new DBObjectSet(DBObjectSearch::FromOQL($sOQL),
+    						array(),
+    						array(
+    							'ticket' => $this->GetKey(),
+    							)
+    						);
+    		//automatically resolve child requests
+    		while($oRequest = $oChildRequestSet->Fetch())
+    		{
+    			if ( $oRequest->Get('status') != 'resolved')
+    			{
+    				$oRequest->set('servicesubcategory_id',$this->Get('servicesubcategory_id'));
+    				$oRequest->set('service_id',$this->Get('service_id'));		
+    				$oRequest->set('team_id',$this->Get('team_id'));
+    				$oRequest->set('agent_id',$this->Get('agent_id'));	
+    				$oRequest->set('resolution_code',$this->Get('resolution_code'));
+    				$oRequest->set('solution','Automatically resolved by event:[[Evento:'.$this->Get('ref').']]');
+    				$oRequest->ApplyStimulus('ev_autoresolve');
+    				$oRequest->DBUpdate();
+    			}
+    		}
+        }
+
+		//automatically resolve child events
+		$sOQL = "SELECT Evento WHERE parent_incident_id=:ticket";
+		$oChildEventoSet = new DBObjectSet(DBObjectSearch::FromOQL($sOQL),
+						array(),
+						array(
+							'ticket' => $this->GetKey(),
+							)
+						);
+		while($oEvento = $oChildEventoSet->Fetch())
+		{
+			if ( $oEvento->Get('status') != 'resolved')
+			{
+				$oEvento->set('servicesubcategory_id',$this->Get('servicesubcategory_id'));
+				$oEvento->set('service_id',$this->Get('service_id'));		
+				$oEvento->set('team_id',$this->Get('team_id'));
+				$oEvento->set('agent_id',$this->Get('agent_id'));	
+				$oEvento->set('resolution_code',$this->Get('resolution_code'));
+				$oEvento->set('solution','Automatically resolved by event:[[Evento:'.$this->Get('ref').']]');
+				$oEvento->ApplyStimulus('ev_autoresolve');
+				$oEvento->DBUpdate();
+			}
+		}
+		return true;
+
+	}]]>
+					</code>
+				</method>
+				<method id="ResolveChildTickets">
+					<comment>
+						<![CDATA[/**
+	 * Cascade the resolution to child User Request and Eventos
+	 * @return true (returning false would stop the ongoing transition)
+	 */]]>
+					</comment>
+					<static>false</static>
+					<access>public</access>
+					<type>LifecycleAction</type>
+					<arguments></arguments>
+					<code>
+						<![CDATA[	public function ResolveChildTickets()
+	{
+        static $aRequests = array(); // prevent infinite recursion
+        static $Eventos = array(); // prevent infinite recursion
+  
+		if (MetaModel::IsValidClass('UserRequest'))
+		{    		
+    		// Automatically resolve child requests
+    		$sOQL = "SELECT UserRequest WHERE parent_incident_id = :ticket AND status != 'resolved'";
+    		$oChildRequestSet = new DBObjectSet(DBObjectSearch::FromOQL($sOQL), array(), array('ticket' => $this->GetKey()));
+    		while($oRequest = $oChildRequestSet->Fetch())
+    		{
+    			if (!array_key_exists($oRequest->GetKey(), $aRequests))
+    			{
+    				$aRequests[$oRequest->GetKey()] = true;
+    				$oRequest->ResolveFrom($this);
+    			}
+    		}
+		}
+
+		// Automatically resolve child events
+		$sOQL = "SELECT Evento WHERE parent_incident_id = :ticket AND status != 'resolved'";
+		$oChildEventoSet = new DBObjectSet(DBObjectSearch::FromOQL($sOQL), array(), array('ticket' => $this->GetKey()));
+		while($oEvento = $oChildEventoSet->Fetch())
+		{
+            if (!array_key_exists($oEvento->GetKey(), $Eventos))
+            {
+                $Eventos[$oEvento->GetKey()] = true;
+			    $oEvento->ResolveFrom($this);
+            }
+		}
+		return true;
+	}]]>
+					</code>
+				</method>
+				<method id="ResolveFrom">
+					<comment>
+						<![CDATA[/**
+	 * Resolve the ticket from another resolved ticket
+	 * @return void
+	 */]]>
+					</comment>
+					<static>false</static>
+					<access>public</access>
+					<type>Internal</type>
+					<code>
+						<![CDATA[	public function ResolveFrom($oParentTicket)
+	{
+		if ($this->Get('status') != 'resolved' && $this->Get('status') != 'closed' )
+		{
+			$aDummy = array();
+			$aExcludedAttributes = array('team_id', 'agent_id');
+		    foreach(MetaModel::ListAttributeDefs(get_class($this)) as $sAttCode => $oAttDef)
+		    {
+		    	// Exclude inter dependant attributes to keep consistency
+		    	if(in_array($sAttCode, $aExcludedAttributes))
+		    	{
+		    		continue;
+		    	}
+		    	
+		         if (($this->GetAttributeFlags($sAttCode, $aDummy, 'resolved') & OPT_ATT_MANDATORY) && empty($this->Get($sAttCode)))
+		         {
+		            $this->Set($sAttCode, $oParentTicket->Get($sAttCode));
+		         }
+		    }
+		  if (($this->Get('team_id') == 0) || ($this->Get('agent_id') ==0))  
+           {  
+                  $this->Set('team_id', $oParentTicket->Get('team_id'));
+                  $this->Set('agent_id', $oParentTicket->Get('agent_id'));
+           }
+			$sParent = '[['.get_class($oParentTicket).':'.$oParentTicket->Get('ref').']]';
+			$this->Set('solution', Dict::Format('Tickets:ResolvedFrom', $sParent, MetaModel::GetName(get_class($oParentTicket))));
+			$this->ApplyStimulus('ev_autoresolve');
+			$this->DBUpdate();
+		}
+	}]]>
+					</code>
+				</method>
+				<method id="UpdateChildRequestLog">
+					<static>false</static>
+					<access>public</access>
+					<type>LifecycleAction</type>
+					<code>
+						<![CDATA[	public function UpdateChildRequestLog()
+	{
+        if (!MetaModel::IsValidClass('UserRequest')) return true; // Do nothing
+  
+		$oLog = $this->Get('public_log');
+		$sLogPublic = $oLog->GetModifiedEntry('html');
+		if ($sLogPublic != '')
+		{
+			$sOQL = "SELECT UserRequest WHERE parent_incident_id=:ticket";
+			$oChildRequestSet = new DBObjectSet(DBObjectSearch::FromOQL($sOQL),
+							array(),
+							array(
+								'ticket' => $this->GetKey(),
+								)
+							);
+			while($oRequest = $oChildRequestSet->Fetch())
+			{
+				$oRequest->set('public_log',$sLogPublic);
+				$oRequest->DBUpdate();
+			}
+
+		}
+		$oLog = $this->Get('private_log');
+		$sLogPrivate = $oLog->GetModifiedEntry('html');
+		if ($sLogPrivate != '')
+		{
+			$sOQL = "SELECT UserRequest WHERE parent_incident_id=:ticket";
+			$oChildRequestSet = new DBObjectSet(DBObjectSearch::FromOQL($sOQL),
+							array(),
+							array(
+								'ticket' => $this->GetKey(),
+								)
+							);
+			while($oRequest = $oChildRequestSet->Fetch())
+			{
+				$oRequest->set('private_log',$sLogPrivate);
+				$oRequest->DBUpdate();
+			}
+		}
+		return true;
+
+	}]]>
+					</code>
+				</method>
+				<method id="UpdateChildEventoLog">
+					<static>false</static>
+					<access>public</access>
+					<type>LifecycleAction</type>
+					<code>
+						<![CDATA[	public function UpdateChildEventoLog()
+	{
+		$oLog = $this->Get('public_log');
+		$sLogPublic = $oLog->GetModifiedEntry('html');
+		if ($sLogPublic != '')
+		{
+			$sOQL = "SELECT Evento WHERE parent_incident_id=:ticket";
+			$oChildEventoSet = new DBObjectSet(DBObjectSearch::FromOQL($sOQL),
+							array(),
+							array(
+								'ticket' => $this->GetKey(),
+								)
+							);
+			while($oEvento = $oChildEventoSet->Fetch())
+			{
+				$oEvento->set('public_log',$sLogPublic);
+				$oEvento->DBUpdate();
+			}
+
+		}
+		$oLog = $this->Get('private_log');
+		$sLogPrivate = $oLog->GetModifiedEntry('html');
+		if ($sLogPrivate != '')
+		{
+			$sOQL = "SELECT Evento WHERE parent_incident_id=:ticket";
+			$oChildEventoSet = new DBObjectSet(DBObjectSearch::FromOQL($sOQL),
+							array(),
+							array(
+								'ticket' => $this->GetKey(),
+								)
+							);
+			while($oEvento = $oChildEventoSet->Fetch())
+			{
+				$oEvento->set('private_log',$sLogPrivate);
+				$oEvento->DBUpdate();
+			}
+		}
+		return true;
+
+	}]]>
+					</code>
+				</method>
+				<method id="ComputeImpactedItems">
+					<static>false</static>
+					<access>public</access>
+					<type>LifecycleAction</type>
+					<code>
+						<![CDATA[	public function ComputeImpactedItems()
+	{
+        // This method is kept for backward compatibility
+        // in case a delta redefines it, but you may call
+        // UpdateImpactedItems directly
+		$this->UpdateImpactedItems();
+	}]]>
+					</code>
+				</method>
+				<method id="OnInsert">
+					<static>false</static>
+					<access>protected</access>
+					<type>Overload-DBObject</type>
+					<code>
+						<![CDATA[	protected function OnInsert()
+
+	{
+        parent::OnInsert();    
+		$this->ComputeImpactedItems();
+		$this->SetIfNull('last_update', time());
+		$this->SetIfNull('start_date', time());
+	}]]>
+					</code>
+				</method>
+				<method id="OnUpdate">
+					<static>false</static>
+					<access>protected</access>
+					<type>Overload-DBObject</type>
+					<code>
+						<![CDATA[	protected function OnUpdate()
+	{
+        parent::OnUpdate(); 
+        $aChanges = $this->ListChanges();
+        if (array_key_exists('functionalcis_list', $aChanges))
+        {
+            $this->UpdateImpactedItems();
+        }
+		$this->Set('last_update', time());
+		$this->UpdateChildRequestLog();
+		$this->UpdateChildEventoLog();
+	}]]>
+					</code>
+				</method>
+			</methods>
+			<presentation>
+				<details>
+					<items>
+						<item id="functionalcis_list">
+							<rank>10</rank>
+						</item>
+						<item id="contacts_list">
+							<rank>20</rank>
+						</item>
+						<item id="child_incidents_list">
+							<rank>30</rank>
+						</item>
+						<item id="related_request_list">
+							<rank>40</rank>
+						</item>
+						<item id="workorders_list">
+							<rank>50</rank>
+						</item>
+						<item id="col:col1">
+							<rank>60</rank>
+							<items>
+								<item id="fieldset:Ticket:baseinfo">
+									<rank>10</rank>
+									<items>
+										<item id="org_id">
+											<rank>10</rank>
+										</item>
+										<item id="caller_id">
+											<rank>20</rank>
+										</item>
+										<item id="status">
+											<rank>30</rank>
+										</item>
+										<item id="origin">
+											<rank>40</rank>
+										</item>
+										<item id="title">
+											<rank>50</rank>
+										</item>
+										<item id="type_id">
+											<rank>60</rank>
+										</item>
+										<item id="description">
+											<rank>70</rank>
+										</item>
+									</items>
+								</item>
+								<item id="fieldset:Ticket:moreinfo">
+									<rank>20</rank>
+									<items>
+										<item id="service_id">
+											<rank>10</rank>
+										</item>
+										<item id="servicesubcategory_id">
+											<rank>20</rank>
+										</item>
+										<item id="escalation_flag">
+											<rank>30</rank>
+										</item>
+										<item id="escalation_reason">
+											<rank>40</rank>
+										</item>
+										<item id="pending_reason">
+											<rank>50</rank>
+										</item>
+									</items>
+								</item>
+							</items>
+						</item>
+						<item id="col:col2">
+							<rank>70</rank>
+							<items>
+								<item id="fieldset:Ticket:Type">
+									<rank>10</rank>
+									<items>
+										<item id="impact">
+											<rank>10</rank>
+										</item>
+										<item id="urgency">
+											<rank>20</rank>
+										</item>
+										<item id="priority">
+											<rank>30</rank>
+										</item>
+									</items>
+								</item>
+								<item id="fieldset:Ticket:contact">
+									<rank>20</rank>
+									<items>
+										<item id="team_id">
+											<rank>10</rank>
+										</item>
+										<item id="agent_id">
+											<rank>20</rank>
+										</item>
+									</items>
+								</item>
+								<item id="fieldset:Ticket:date">
+									<rank>30</rank>
+									<items>
+										<item id="start_date">
+											<rank>10</rank>
+										</item>
+										<item id="last_update">
+											<rank>20</rank>
+										</item>
+										<item id="assignment_date">
+											<rank>30</rank>
+										</item>
+										<item id="tto_escalation_deadline">
+											<rank>40</rank>
+										</item>
+										<item id="ttr_escalation_deadline">
+											<rank>50</rank>
+										</item>
+										<item id="last_pending_date">
+											<rank>60</rank>
+										</item>
+										<item id="resolution_date">
+											<rank>70</rank>
+										</item>
+										<item id="close_date">
+											<rank>80</rank>
+										</item>
+									</items>
+								</item>
+							</items>
+						</item>
+						<item id="col:col3">
+							<rank>80</rank>
+							<items>
+								<item id="fieldset:Ticket:relation">
+									<rank>10</rank>
+									<items>
+										<item id="parent_incident_id">
+											<rank>10</rank>
+										</item>
+										<item id="parent_problem_id">
+											<rank>20</rank>
+										</item>
+										<item id="parent_change_id">
+											<rank>30</rank>
+										</item>
+									</items>
+								</item>
+								<item id="fieldset:Ticket:resolution">
+									<rank>20</rank>
+									<items>
+										<item id="resolution_code">
+											<rank>10</rank>
+										</item>
+										<item id="solution">
+											<rank>20</rank>
+										</item>
+										<item id="time_spent">
+											<rank>30</rank>
+										</item>
+										<item id="user_satisfaction">
+											<rank>40</rank>
+										</item>
+										<item id="user_comment">
+											<rank>50</rank>
+										</item>
+									</items>
+								</item>
+								<item id="fieldset:Ticket:SLA">
+									<rank>30</rank>
+									<items>
+										<item id="sla_tto_passed">
+											<rank>10</rank>
+										</item>
+										<item id="sla_tto_over">
+											<rank>20</rank>
+										</item>
+										<item id="sla_ttr_passed">
+											<rank>30</rank>
+										</item>
+										<item id="sla_ttr_over">
+											<rank>40</rank>
+										</item>
+									</items>
+								</item>
+							</items>
+						</item>
+					</items>
+				</details>
+				<search>
+					<items>
+						<item id="ref">
+							<rank>10</rank>
+						</item>
+						<item id="org_id">
+							<rank>20</rank>
+						</item>
+						<item id="title">
+							<rank>30</rank>
+						</item>
+						<item id="description">
+							<rank>40</rank>
+						</item>
+						<item id="start_date">
+							<rank>50</rank>
+						</item>
+						<item id="resolution_date">
+							<rank>70</rank>
+						</item>
+						<item id="close_date">
+							<rank>80</rank>
+						</item>
+						<item id="status">
+							<rank>90</rank>
+						</item>
+						<item id="operational_status">
+							<rank>95</rank>
+						</item>
+						<item id="caller_id">
+							<rank>100</rank>
+						</item>
+						<item id="origin">
+							<rank>110</rank>
+						</item>
+						<item id="impact">
+							<rank>120</rank>
+						</item>
+						<item id="urgency">
+							<rank>130</rank>
+						</item>
+						<item id="priority">
+							<rank>140</rank>
+						</item>
+						<item id="type_id">
+							<rank>150</rank>
+						</item>
+						<item id="service_id">
+							<rank>160</rank>
+						</item>
+						<item id="servicesubcategory_id">
+							<rank>170</rank>
+						</item>
+						<item id="team_id">
+							<rank>180</rank>
+						</item>
+						<item id="agent_id">
+							<rank>190</rank>
+						</item>
+						<item id="escalation_flag">
+							<rank>200</rank>
+						</item>
+						<item id="resolution_code">
+							<rank>210</rank>
+						</item>
+						<item id="user_satisfaction">
+							<rank>220</rank>
+						</item>
+						<item id="sla_tto_passed">
+							<rank>230</rank>
+						</item>
+						<item id="sla_ttr_passed">
+							<rank>240</rank>
+						</item>
+					</items>
+				</search>
+				<list>
+					<items>
+						<item id="title">
+							<rank>10</rank>
+						</item>
+						<item id="org_id">
+							<rank>20</rank>
+						</item>
+						<item id="caller_id">
+							<rank>30</rank>
+						</item>
+						<item id="start_date">
+							<rank>40</rank>
+						</item>
+						<item id="status">
+							<rank>50</rank>
+						</item>
+						<item id="agent_id">
+							<rank>60</rank>
+						</item>
+					</items>
+				</list>
+			</presentation>
+		</class>
+	</classes>
+	<menus>
+		<menu id="EventoManagement" xsi:type="MenuGroup" _delta="define">
+			<rank>35</rank>
+			<enable_stimulus />
+		</menu>
+		<menu id="Evento:Overview" xsi:type="DashboardMenuNode" _delta="define">
+			<rank>0</rank>
+			<parent>EventoManagement</parent>
+			<definition>
+				<layout>DashboardLayoutTwoCols</layout>
+				<title>UI:EventoMgmtMenuOverview:Title</title>
+				<cells>
+					<cell id="0">
+						<rank>0</rank>
+						<dashlets>
+							<dashlet id="1" xsi:type="DashletGroupByPie">
+								<title>UI-EventoManagementOverview-EventoByPriority-last-14-days</title>
+								<query>SELECT Evento WHERE DATE_SUB(NOW(), INTERVAL 14 DAY) &lt; start_date</query>
+								<group_by>priority</group_by>
+								<style>pie</style>
+							</dashlet>
+						</dashlets>
+					</cell>
+					<cell id="1">
+						<rank>1</rank>
+						<dashlets>
+							<dashlet id="2" xsi:type="DashletGroupByBars">
+								<title>UI-EventoManagementOverview-Last-14-days</title>
+								<query>SELECT Evento WHERE DATE_SUB(NOW(), INTERVAL 14 DAY) &lt; start_date</query>
+								<group_by>start_date:day_of_month</group_by>
+								<style>bars</style>
+							</dashlet>
+						</dashlets>
+					</cell>
+					<cell id="2">
+						<rank>2</rank>
+						<dashlets>
+							<dashlet id="3" xsi:type="DashletGroupByTable">
+								<title>UI-EventoManagementOverview-OpenEventoByStatus</title>
+								<query>SELECT Evento WHERE status NOT IN ('closed','rejected')</query>
+								<group_by>status</group_by>
+								<style>table</style>
+							</dashlet>
+						</dashlets>
+					</cell>
+					<cell id="3">
+						<rank>3</rank>
+						<dashlets>
+							<dashlet id="4" xsi:type="DashletGroupByTable">
+								<title>UI-EventoManagementOverview-OpenEventoByAgent</title>
+								<query>SELECT Evento WHERE status NOT IN ('closed','rejected')</query>
+								<group_by>agent_id</group_by>
+								<style>table</style>
+							</dashlet>
+						</dashlets>
+					</cell>
+					<cell id="4">
+						<rank>4</rank>
+						<dashlets>
+							<dashlet id="5" xsi:type="DashletGroupByTable">
+								<title>UI-EventoManagementOverview-OpenEventoByCustomer</title>
+								<query>SELECT Evento WHERE status NOT IN ('closed','rejected')</query>
+								<group_by>org_id</group_by>
+								<style>table</style>
+							</dashlet>
+						</dashlets>
+					</cell>
+				</cells>
+			</definition>
+		</menu>
+		<menu id="NewEvento" xsi:type="NewObjectMenuNode" _delta="define">
+			<rank>1</rank>
+			<parent>EventoManagement</parent>
+			<class>Evento</class>
+		</menu>
+		<menu id="SearchEventos" xsi:type="SearchMenuNode" _delta="define">
+			<rank>2</rank>
+			<parent>EventoManagement</parent>
+			<class>Evento</class>
+		</menu>
+		<menu id="Evento:Shortcuts" xsi:type="TemplateMenuNode" _delta="define">
+			<rank>3</rank>
+			<parent>EventoManagement</parent>
+			<template_file />
+		</menu>
+		<menu id="Evento:MyEventos" xsi:type="OQLMenuNode" _delta="define">
+			<rank>0</rank>
+			<parent>Evento:Shortcuts</parent>
+			<oql>
+				<![CDATA[SELECT Evento WHERE agent_id = :current_contact_id AND status NOT IN ("closed","resolved")]]>
+			</oql>
+			<do_search />
+			<auto_reload>fast</auto_reload>
+		</menu>
+		<menu id="Evento:EscalatedEventos" xsi:type="OQLMenuNode" _delta="define">
+			<rank>1</rank>
+			<parent>Evento:Shortcuts</parent>
+			<oql>
+				<![CDATA[SELECT Evento WHERE status IN ("escalated_tto", "escalated_ttr") OR escalation_flag="yes"]]>
+			</oql>
+			<do_search />
+			<auto_reload>fast</auto_reload>
+		</menu>
+		<menu id="Evento:OpenEventos" xsi:type="OQLMenuNode" _delta="define">
+			<rank>2</rank>
+			<parent>Evento:Shortcuts</parent>
+			<oql>
+				<![CDATA[SELECT Evento WHERE status NOT IN ("closed")]]>
+			</oql>
+			<do_search>1</do_search>
+			<auto_reload>fast</auto_reload>
+		</menu>
+	</menus>
+	<dictionaries>
+		<dictionary id="ES CR">
+			<entries>
+				<entry id="Menu:EventoManagement" _delta="define">
+					<![CDATA[Administración de Eventos]]>
+				</entry>
+				<entry id="Menu:EventoManagement+" _delta="define">
+					<![CDATA[Administración de Eventos]]>
+				</entry>
+				<entry id="Menu:Evento:Overview" _delta="define">
+					<![CDATA[Resumen de Eventos]]>
+				</entry>
+				<entry id="Menu:Evento:Overview+" _delta="define">
+					<![CDATA[Resumen de Eventos]]>
+				</entry>
+				<entry id="UI:EventoMgmtMenuOverview:Title" _delta="define">
+					<![CDATA[Panel de Control para Administración de Eventos]]>
+				</entry>
+				<entry id="UI-EventoManagementOverview-EventoByType-last-14-days" _delta="define">
+					<![CDATA[Eventos por Tipo de los Últimos 14 días]]>
+				</entry>
+				<entry id="UI-EventoManagementOverview-Last-14-days" _delta="define">
+					<![CDATA[Número de Eventos de los Últimos 14 días]]>
+				</entry>
+				<entry id="UI-EventoManagementOverview-OpenEventoByStatus" _delta="define">
+					<![CDATA[Eventos Abiertos por Estatus]]>
+				</entry>
+				<entry id="UI-EventoManagementOverview-OpenEventoByAgent" _delta="define">
+					<![CDATA[Eventos Abiertos por Analista]]>
+				</entry>
+				<entry id="UI-EventoManagementOverview-OpenEventoByType" _delta="define">
+					<![CDATA[Eventos Abiertos por Tipo]]>
+				</entry>
+				<entry id="UI-EventoManagementOverview-OpenEventoByCustomer" _delta="define">
+					<![CDATA[Eventos Abiertos por Cliente]]>
+				</entry>
+				<entry id="Menu:NewEvento" _delta="define">
+					<![CDATA[Nuevo Evento]]>
+				</entry>
+				<entry id="Menu:NewEvento+" _delta="define">
+					<![CDATA[Nuevo Evento]]>
+				</entry>
+				<entry id="Menu:SearchEventos" _delta="define">
+					<![CDATA[Búsqueda de Eventos de Usuario]]>
+				</entry>
+				<entry id="Menu:SearchEventos+" _delta="define">
+					<![CDATA[Búsqueda de Eventos de Usuario]]>
+				</entry>
+				<entry id="Menu:Evento:Shortcuts" _delta="define">
+					<![CDATA[Acceso Rápido]]>
+				</entry>
+				<entry id="Menu:Evento:Shortcuts+" _delta="define">
+					<![CDATA[Acceso Rápido]]>
+				</entry>
+				<entry id="Menu:Evento:MyEventos" _delta="define">
+					<![CDATA[Eventos Asignados a Mí]]>
+				</entry>
+				<entry id="Menu:Evento:MyEventos+" _delta="define">
+					<![CDATA[Eventos Asignados a Mí (como Analista)]]>
+				</entry>
+				<entry id="Menu:Evento:MySupportEventos" _delta="define">
+					<![CDATA[Llamadas de Soporte Asignadas a Mí]]>
+				</entry>
+				<entry id="Menu:Evento:MySupportEventos+" _delta="define">
+					<![CDATA[Llamadas de Soporte Asignadas a Mí (como Analista)]]>
+				</entry>
+				<entry id="Menu:Evento:EscalatedEventos" _delta="define">
+					<![CDATA[Eventos Escalados]]>
+				</entry>
+				<entry id="Menu:Evento:EscalatedEventos+" _delta="define">
+					<![CDATA[Eventos Escalados]]>
+				</entry>
+				<entry id="Menu:Evento:OpenEventos" _delta="define">
+					<![CDATA[Eventos Abiertos]]>
+				</entry>
+				<entry id="Menu:Evento:OpenEventos+" _delta="define">
+					<![CDATA[Eventos Abiertos]]>
+				</entry>
+				<entry id="Class:Evento:KnownErrorList" _delta="define">
+					<![CDATA[Errores Conocidos]]>
+				</entry>
+				<entry id="Class:Evento" _delta="define">
+					<![CDATA[Evento]]>
+				</entry>
+				<entry id="Class:Evento+" _delta="define">
+					<![CDATA[Evento]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:status" _delta="define">
+					<![CDATA[Estatus]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:status+" _delta="define">
+					<![CDATA[Estatus]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:status/Value:new" _delta="define">
+					<![CDATA[Nuevo]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:status/Value:new+" _delta="define">
+					<![CDATA[Nuevo]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:status/Value:escalated_tto" _delta="define">
+					<![CDATA[Escalado por Tiempo de Asignación]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:status/Value:escalated_tto+" _delta="define">
+					<![CDATA[Escalado por Tiempo de Asignación]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:status/Value:assigned" _delta="define">
+					<![CDATA[Asignado]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:status/Value:assigned+" _delta="define">
+					<![CDATA[Asignado]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:status/Value:escalated_ttr" _delta="define">
+					<![CDATA[Escalado por Tiempo de Solución]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:status/Value:escalated_ttr+" _delta="define">
+					<![CDATA[Escalado por Tiempo de Solución]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:status/Value:waiting_for_approval" _delta="define">
+					<![CDATA[Esperando Aprobación]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:status/Value:waiting_for_approval+" _delta="define">
+					<![CDATA[Esperando Aprobación]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:status/Value:approved" _delta="define">
+					<![CDATA[Aprobado]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:status/Value:approved+" _delta="define">
+					<![CDATA[Aprobado]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:status/Value:rejected" _delta="define">
+					<![CDATA[Rechazado]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:status/Value:rejected+" _delta="define">
+					<![CDATA[Rechazado]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:status/Value:pending" _delta="define">
+					<![CDATA[Pendiente]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:status/Value:pending+" _delta="define">
+					<![CDATA[Pendiente]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:status/Value:resolved" _delta="define">
+					<![CDATA[Solucionado]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:status/Value:resolved+" _delta="define">
+					<![CDATA[Solucionado]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:status/Value:closed" _delta="define">
+					<![CDATA[Cerrado]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:status/Value:closed+" _delta="define">
+					<![CDATA[Cerrado]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:request_type" _delta="define">
+					<![CDATA[Tipo de Reporte]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:request_type+" _delta="define">
+					<![CDATA[Tipo de Reporte]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:request_type/Value:service_request" _delta="define">
+					<![CDATA[Observación de Servicio]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:request_type/Value:service_request+" _delta="define">
+					<![CDATA[Observación de Servicio]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:impact" _delta="define">
+					<![CDATA[Impacto]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:impact+" _delta="define">
+					<![CDATA[Impacto]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:impact/Value:1" _delta="define">
+					<![CDATA[Un Departamento]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:impact/Value:1+" _delta="define">
+					<![CDATA[Un Departamento]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:impact/Value:2" _delta="define">
+					<![CDATA[Un Servicio]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:impact/Value:2+" _delta="define">
+					<![CDATA[Un Servicio]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:impact/Value:3" _delta="define">
+					<![CDATA[Una Persona]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:impact/Value:3+" _delta="define">
+					<![CDATA[Una Persona]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:priority" _delta="define">
+					<![CDATA[Prioridad]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:priority+" _delta="define">
+					<![CDATA[Prioridad]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:priority/Value:1" _delta="define">
+					<![CDATA[Crítica]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:priority/Value:1+" _delta="define">
+					<![CDATA[Crítica]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:priority/Value:2" _delta="define">
+					<![CDATA[Alta]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:priority/Value:2+" _delta="define">
+					<![CDATA[Alta]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:priority/Value:3" _delta="define">
+					<![CDATA[Media]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:priority/Value:3+" _delta="define">
+					<![CDATA[Media]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:priority/Value:4" _delta="define">
+					<![CDATA[Baja]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:priority/Value:4+" _delta="define">
+					<![CDATA[Baja]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:urgency" _delta="define">
+					<![CDATA[Urgencia]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:urgency+" _delta="define">
+					<![CDATA[Urgencia]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:urgency/Value:1" _delta="define">
+					<![CDATA[Crítica]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:urgency/Value:1+" _delta="define">
+					<![CDATA[Critica]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:urgency/Value:2" _delta="define">
+					<![CDATA[Alta]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:urgency/Value:2+" _delta="define">
+					<![CDATA[Alta]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:urgency/Value:3" _delta="define">
+					<![CDATA[Media]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:urgency/Value:3+" _delta="define">
+					<![CDATA[Media]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:urgency/Value:4" _delta="define">
+					<![CDATA[Baja]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:urgency/Value:4+" _delta="define">
+					<![CDATA[Baja]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:origin" _delta="define">
+					<![CDATA[Origen]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:origin+" _delta="define">
+					<![CDATA[Origen]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:origin/Value:PRTG" _delta="define">
+					<![CDATA[PTRG]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:origin/Value:PRTG+" _delta="define">
+					<![CDATA[PRTG]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:origin/Value:Dynatrace" _delta="define">
+					<![CDATA[Dynatrace]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:origin/Value:Dynatrace+" _delta="define">
+					<![CDATA[Dynatrace]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:origin/Value:24x7" _delta="define">
+					<![CDATA[24x7]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:origin/Value:24x7+" _delta="define">
+					<![CDATA[24x7]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:origin/Value:Tomcat" _delta="define">
+					<![CDATA[Tomcat]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:origin/Value:Tomcat+" _delta="define">
+					<![CDATA[Tomcat]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:Observación" _delta="define">
+					<![CDATA[Aprobador]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:Observación+" _delta="define">
+					<![CDATA[Aprobador]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:approver_email" _delta="define">
+					<![CDATA[Correo Electrónico del Aprobador]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:approver_email+" _delta="define">
+					<![CDATA[Correo Electrónico del Aprobador]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:type_id" _delta="define">
+					<![CDATA[Tipo de Alerta]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:type_id+" _delta="define">
+					<![CDATA[Tipo de Alerta]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:type_name" _delta="define">
+					<![CDATA[Nombre tipo de alerta]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:type_name+" _delta="define">
+					<![CDATA[Nombre tipo de alerta]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:service_id" _delta="define">
+					<![CDATA[Servicio]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:service_id+" _delta="define">
+					<![CDATA[Servicio]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:service_name" _delta="define">
+					<![CDATA[Servicio]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:service_name+" _delta="define">
+					<![CDATA[Servicio]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:servicesubcategory_id" _delta="define">
+					<![CDATA[Subcategoría]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:servicesubcategory_id+" _delta="define">
+					<![CDATA[Subcategoría]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:servicesubcategory_name" _delta="define">
+					<![CDATA[Subcategoría]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:servicesubcategory_name+" _delta="define">
+					<![CDATA[Subcategoría de Servicio]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:escalation_flag" _delta="define">
+					<![CDATA[Bandera de Escalamiento]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:escalation_flag+" _delta="define">
+					<![CDATA[Bandera de Escalamiento]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:escalation_flag/Value:no" _delta="define">
+					<![CDATA[No]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:escalation_flag/Value:no+" _delta="define">
+					<![CDATA[No]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:escalation_flag/Value:yes" _delta="define">
+					<![CDATA[Si]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:escalation_flag/Value:yes+" _delta="define">
+					<![CDATA[Si]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:escalation_reason" _delta="define">
+					<![CDATA[Motivo de Escalamiento]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:escalation_reason+" _delta="define">
+					<![CDATA[Motivo de Escalamiento]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:assignment_date" _delta="define">
+					<![CDATA[Fecha de Asignación]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:assignment_date+" _delta="define">
+					<![CDATA[Fecha de Asignación]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:resolution_date" _delta="define">
+					<![CDATA[Fecha de Solución]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:resolution_date+" _delta="define">
+					<![CDATA[Fecha de Solución]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:last_pending_date" _delta="define">
+					<![CDATA[Última Fecha de Espera]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:last_pending_date+" _delta="define">
+					<![CDATA[Última Fecha de Espera]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:cumulatedpending" _delta="define">
+					<![CDATA[Espera Acumulada]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:cumulatedpending+" _delta="define">
+					<![CDATA[Espera Acumulada]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:tto" _delta="define">
+					<![CDATA[TDA - Tiempo de Asignación]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:tto+" _delta="define">
+					<![CDATA[Tiempo de Asignación]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:ttr" _delta="define">
+					<![CDATA[TDS - Tiempo de Solución]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:ttr+" _delta="define">
+					<![CDATA[Tiempo de Solución]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:tto_escalation_deadline" _delta="define">
+					<![CDATA[Límite de Tiempo de Asignación]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:tto_escalation_deadline+" _delta="define">
+					<![CDATA[Límite de Tiempo de Asignación]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:sla_tto_passed" _delta="define">
+					<![CDATA[SLA de Tiempo de Asignanción Cumplido]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:sla_tto_passed+" _delta="define">
+					<![CDATA[SLA de Tiempo de Asignanción Cumplido]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:sla_tto_over" _delta="define">
+					<![CDATA[SLA de Tiempo de Asignación Excedído]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:sla_tto_over+" _delta="define">
+					<![CDATA[SLA de Tiempo de Asignación Excedído]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:ttr_escalation_deadline" _delta="define">
+					<![CDATA[Límite de Tiempo de Solución]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:ttr_escalation_deadline+" _delta="define">
+					<![CDATA[Límite de Tiempo de Solución]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:sla_ttr_passed" _delta="define">
+					<![CDATA[SLA de Tiempo de Solución Cumplido]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:sla_ttr_passed+" _delta="define">
+					<![CDATA[SLA de Tiempo de Solución Cumplido]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:sla_ttr_over" _delta="define">
+					<![CDATA[SLA de Tiempo de Solución Excedído]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:sla_ttr_over+" _delta="define">
+					<![CDATA[SLA de Tiempo de Solución Excedído]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:time_spent" _delta="define">
+					<![CDATA[Tiempo Utilizado]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:time_spent+" _delta="define">
+					<![CDATA[Tiempo Utilizado]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:resolution_code" _delta="define">
+					<![CDATA[Código de Solución]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:resolution_code+" _delta="define">
+					<![CDATA[Código de Solución]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:resolution_code/Value:assistance" _delta="define">
+					<![CDATA[Asistencia]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:resolution_code/Value:assistance+" _delta="define">
+					<![CDATA[Asistencia]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:resolution_code/Value:bug fixed" _delta="define">
+					<![CDATA[Falla Corregida]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:resolution_code/Value:bug fixed+" _delta="define">
+					<![CDATA[Falla Corregida]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:resolution_code/Value:voucher reprocessing" _delta="define">
+					<![CDATA[Reproceso de Comprobante]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:resolution_code/Value:voucher reprocessing+" _delta="define">
+					<![CDATA[Reproceso de Comprobante]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:resolution_code/Value:hardware repair" _delta="define">
+					<![CDATA[Reparación de Hardware]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:resolution_code/Value:hardware repair+" _delta="define">
+					<![CDATA[Reparación de Hardware]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:resolution_code/Value:other" _delta="define">
+					<![CDATA[Otro]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:resolution_code/Value:other+" _delta="define">
+					<![CDATA[Otro]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:resolution_code/Value:software patch" _delta="define">
+					<![CDATA[Parche de Software]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:resolution_code/Value:software patch+" _delta="define">
+					<![CDATA[Parche de Software]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:resolution_code/Value:system update" _delta="define">
+					<![CDATA[Actualización de Sistema]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:resolution_code/Value:system update+" _delta="define">
+					<![CDATA[Actualización de Sistema]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:resolution_code/Value:training" _delta="define">
+					<![CDATA[Capacitación]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:resolution_code/Value:training+" _delta="define">
+					<![CDATA[Capacitación]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:solution" _delta="define">
+					<![CDATA[Solución]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:solution+" _delta="define">
+					<![CDATA[Solución]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:pending_reason" _delta="define">
+					<![CDATA[Motivo Pendiente]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:pending_reason+" _delta="define">
+					<![CDATA[Motivo Pendiente]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:parent_request_id" _delta="define">
+					<![CDATA[Observación Padre]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:parent_request_id+" _delta="define">
+					<![CDATA[Observación Padre]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:parent_incident_id" _delta="define">
+					<![CDATA[Incidente Padre]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:parent_incident_id+" _delta="define">
+					<![CDATA[Incidente Padre]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:parent_request_ref" _delta="define">
+					<![CDATA[Ref. Observación]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:parent_request_ref+" _delta="define">
+					<![CDATA[Ref. Observación]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:parent_problem_id" _delta="define">
+					<![CDATA[Problema Padre]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:parent_problem_id+" _delta="define">
+					<![CDATA[Problema Padre]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:parent_problem_ref" _delta="define">
+					<![CDATA[Ref. Problema]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:parent_problem_ref+" _delta="define">
+					<![CDATA[Ref. Problema]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:parent_observation_id" _delta="define">
+					<![CDATA[Observación Padre]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:parent_observation_id+" _delta="define">
+					<![CDATA[Observación Padre]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:parent_observation_ref" _delta="define">
+					<![CDATA[Ref. Observación]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:parent_observation_ref+" _delta="define">
+					<![CDATA[Ref. Observación]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:parent_change_id" _delta="define">
+					<![CDATA[Cambio Padre]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:parent_change_id+" _delta="define">
+					<![CDATA[Cambio Padre]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:parent_change_ref" _delta="define">
+					<![CDATA[Ref. Cambio]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:parent_change_ref+" _delta="define">
+					<![CDATA[Ref. Cambio]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:parent_incident_ref" _delta="define">
+					<![CDATA[Parent incident ref~~]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:parent_incident_ref+" _delta="define">
+					<![CDATA[~~]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:related_request_list" _delta="define">
+					<![CDATA[Requerimientos Relacionados]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:related_request_list+" _delta="define">
+					<![CDATA[Requerimientos Relacionados]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:related_incident_list" _delta="define">
+					<![CDATA[Incidentes Relacionados]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:related_incident_list+" _delta="define">
+					<![CDATA[Incidentes Relacionados]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:child_incidents_list" _delta="define">
+					<![CDATA[Incidentes Hijos]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:child_incidents_list+" _delta="define">
+					<![CDATA[Incidentes Hijos]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:public_log" _delta="define">
+					<![CDATA[Bitácora Pública]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:public_log+" _delta="define">
+					<![CDATA[Bitácora Pública]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:user_satisfaction" _delta="define">
+					<![CDATA[Satisfacción del Usuario]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:user_satisfaction+" _delta="define">
+					<![CDATA[Satisfacción del Usuario]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:user_satisfaction/Value:1" _delta="define">
+					<![CDATA[Muy Satisfecho]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:user_satisfaction/Value:1+" _delta="define">
+					<![CDATA[Muy Satisfecho]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:user_satisfaction/Value:2" _delta="define">
+					<![CDATA[Satisfecho]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:user_satisfaction/Value:2+" _delta="define">
+					<![CDATA[Satisfecho]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:user_satisfaction/Value:3" _delta="define">
+					<![CDATA[Insatisfecho]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:user_satisfaction/Value:3+" _delta="define">
+					<![CDATA[Insatisfecha]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:user_satisfaction/Value:4" _delta="define">
+					<![CDATA[Muy Insatisfecho]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:user_satisfaction/Value:4+" _delta="define">
+					<![CDATA[Muy Insatisfecho]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:user_comment" _delta="define">
+					<![CDATA[Comentarios del Usuario]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:user_comment+" _delta="define">
+					<![CDATA[Comentarios del Usuario]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:parent_request_id_friendlyname" _delta="define">
+					<![CDATA[parent_request_id_friendlyname]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:parent_request_id_friendlyname+" _delta="define">
+					<![CDATA[parent_request_id_friendlyname]]>
+				</entry>
+				<entry id="Class:Evento/Stimulus:ev_assign" _delta="define">
+					<![CDATA[Asignar]]>
+				</entry>
+				<entry id="Class:Evento/Stimulus:ev_assign+" _delta="define">
+					<![CDATA[Asignar]]>
+				</entry>
+				<entry id="Class:Evento/Stimulus:ev_reassign" _delta="define">
+					<![CDATA[Reasignar]]>
+				</entry>
+				<entry id="Class:Evento/Stimulus:ev_reassign+" _delta="define">
+					<![CDATA[Reasignar]]>
+				</entry>
+				<entry id="Class:Evento/Stimulus:ev_approve" _delta="define">
+					<![CDATA[Aprobar]]>
+				</entry>
+				<entry id="Class:Evento/Stimulus:ev_approve+" _delta="define">
+					<![CDATA[Aprobar]]>
+				</entry>
+				<entry id="Class:Evento/Stimulus:ev_reject" _delta="define">
+					<![CDATA[Rechazar]]>
+				</entry>
+				<entry id="Class:Evento/Stimulus:ev_reject+" _delta="define">
+					<![CDATA[Rechazar]]>
+				</entry>
+				<entry id="Class:Evento/Stimulus:ev_pending" _delta="define">
+					<![CDATA[Pendiente]]>
+				</entry>
+				<entry id="Class:Evento/Stimulus:ev_pending+" _delta="define">
+					<![CDATA[Pendiente]]>
+				</entry>
+				<entry id="Class:Evento/Stimulus:ev_timeout" _delta="define">
+					<![CDATA[Timeout]]>
+				</entry>
+				<entry id="Class:Evento/Stimulus:ev_timeout+" _delta="define">
+					<![CDATA[Timeout]]>
+				</entry>
+				<entry id="Class:Evento/Stimulus:ev_autoresolve" _delta="define">
+					<![CDATA[Solución Automática]]>
+				</entry>
+				<entry id="Class:Evento/Stimulus:ev_autoresolve+" _delta="define">
+					<![CDATA[Solución Automática]]>
+				</entry>
+				<entry id="Class:Evento/Stimulus:ev_autoclose" _delta="define">
+					<![CDATA[Cierre Automático]]>
+				</entry>
+				<entry id="Class:Evento/Stimulus:ev_autoclose+" _delta="define">
+					<![CDATA[Cierre Automático]]>
+				</entry>
+				<entry id="Class:Evento/Stimulus:ev_resolve" _delta="define">
+					<![CDATA[Marcar como Solucionado]]>
+				</entry>
+				<entry id="Class:Evento/Stimulus:ev_resolve+" _delta="define">
+					<![CDATA[Marcar como Solucionado]]>
+				</entry>
+				<entry id="Class:Evento/Stimulus:ev_close" _delta="define">
+					<![CDATA[Cerrar este Ticket]]>
+				</entry>
+				<entry id="Class:Evento/Stimulus:ev_close+" _delta="define">
+					<![CDATA[Cerrar este Ticket]]>
+				</entry>
+				<entry id="Class:Evento/Stimulus:ev_reopen" _delta="define">
+					<![CDATA[Reabrir]]>
+				</entry>
+				<entry id="Class:Evento/Stimulus:ev_reopen+" _delta="define">
+					<![CDATA[Reabrir]]>
+				</entry>
+				<entry id="Class:Evento/Stimulus:ev_wait_for_approval" _delta="define">
+					<![CDATA[Esperando Aprobación]]>
+				</entry>
+				<entry id="Class:Evento/Stimulus:ev_wait_for_approval+" _delta="define">
+					<![CDATA[Esperando Aprobación]]>
+				</entry>
+				<entry id="Class:Evento/Error:CannotAssignParentRequestIdToSelf" _delta="define">
+					<![CDATA[No puede asignarse el requerimiento Padre a si mismo]]>
+				</entry>
+				<entry id="Class:Evento/Method:ResolveChildTickets" _delta="define">
+					<![CDATA[Resolver tickets hijos]]>
+				</entry>
+				<entry id="Class:Evento/Method:ResolveChildTickets+" _delta="define">
+					<![CDATA[Cascadear la solución a los tickets hijos (ev_autoresolve), y alinear las siguientes características: servicio, equipo, agente, información de solución]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:reject_reason" _delta="define">
+					<![CDATA[Motivo de rechazo]]>
+				</entry>
+				<entry id="Class:Evento/Attribute:last_reject_date" _delta="define">
+					<![CDATA[Fecha de Rechazo]]>
+				</entry>
+
+				<entry id="Class:EventoType" _delta="define">
+					<![CDATA[Tipo de Alerta]]>
+				</entry>
+				<entry id="Class:EventoType+" _delta="define">
+					<![CDATA[Tipo de Alerta]]>
+				</entry>
+				<entry id="Class:EventoType/Attribute:name" _delta="define">
+					<![CDATA[Nombre]]>
+				</entry>
+				<entry id="Class:EventoType/Attribute:status" _delta="define">
+					<![CDATA[Estado]]>
+				</entry>
+				<entry id="Class:EventoType/Attribute:org_id" _delta="define">
+					<![CDATA[Organización]]>
+				</entry>
+				<entry id="Class:EventoType/Attribute:org_name" _delta="define">
+					<![CDATA[Nombre de organización]]>
+				</entry>
+
+				<entry id="Menu:EventoType" _delta="define">
+					<![CDATA[Tipo de Alerta]]>
+				</entry>
+				<entry id="Menu:EventoType+" _delta="define">
+					<![CDATA[Tipo de Alerta]]>
+				</entry>
+
+			</entries>
+		</dictionary>
+	</dictionaries>
+</itop_design>
